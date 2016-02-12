@@ -43,27 +43,29 @@ CHIP ALU {
 
     PARTS:
     // Put you code here:
+
+    // massage the x and y inputs
     Not16(in=x, out=notx);
     Not16(in=y, out=noty);
-
     Mux4Way16(a=x, b=false, c=notx, d=true, sel[0]=zx, sel[1]=nx, out=fullx);
     Mux4Way16(a=y, b=false, c=noty, d=true, sel[0]=zy, sel[1]=ny, out=fully);
 
+    // set the output
     And16(a=fullx, b=fully, out=xandy);
     Add16(a=fullx, b=fully, out=xplusy);
-
     Mux16(a=xandy, b=xplusy, sel=f, out=preout);
-
     Not16(in=preout, out=notout);
+    Mux16(a=preout, b=notout, sel=no, out=fullout);
+    And16(a=fullout, b=true, out=out);
 
-    Mux16(a=preout, b=notout, sel=no, out=out);
-
-    Mux16(a=preout, b=notout, sel=no, out[8..15]=hfo);
-    Mux16(a=preout, b=notout, sel=no, out[0..7]=lfo);
+    // set zr
+    And16(a=fullout, b=true, out[8..15]=hfo);
+    And16(a=fullout, b=true, out[0..7]=lfo);
     Or8Way(in=lfo, out=lor);
-    Or8Way(in=lfo, out=hor);
+    Or8Way(in=hfo, out=hor);
     Or(a=lor, b=hor, out=notzr);
     Not(in=notzr, out=zr);
 
-    Mux16(a=preout, b=notout, sel=no, out[15]=ng);
+    // set ng
+    And16(a=fullout, b=true, out[15]=ng);
 }
