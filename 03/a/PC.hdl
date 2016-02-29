@@ -17,15 +17,10 @@ CHIP PC {
 
     PARTS:
     // Put your code here:
-    Or(a=reset, b=load, out=resetorload);
-    Or(a=resetorload, b=inc, out=doload);
-
-    Register(in=inputs, load=doload, out=rout);
+    Register(in=inputs, load=true, out=rout, out=out);
     Inc16(in=rout, out=routinc);
 
     Mux16(a=rout, b=routinc, sel=inc, out=outorincout);
     Mux16(a=outorincout, b=in, sel=load, out=inorouts);
     Mux16(a=inorouts, b=false, sel=reset, out=inputs);
-
-    And16(a=rout, b=true, out=out);
 }
