@@ -3,9 +3,58 @@
 // by Nisan and Schocken, MIT Press.
 // File name: projects/04/Fill.asm
 
-// Runs an infinite loop that listens to the keyboard input. 
+// Runs an infinite loop that listens to the keyboard input.
 // When a key is pressed (any key), the program blackens the screen,
 // i.e. writes "black" in every pixel. When no key is pressed, the
 // program clears the screen, i.e. writes "white" in every pixel.
 
 // Put your code here.
+    // 24576 is the last pixel address
+    @24576
+    D=A
+    @last
+    M=D
+
+(START)
+    @SCREEN
+    D=A
+    @x
+    M=D
+    @KBD
+    D=M
+    @UNFILL
+    D;JEQ
+    @FILL
+    0;JMP
+
+(UNFILL)
+    @last
+    D=M
+    @x
+    D=M-D
+    @START
+    D;JEQ
+
+    @x
+    A=M
+    M=0
+    @x
+    M=M+1
+    @UNFILL
+    0;JMP
+
+(FILL)
+    @last
+    D=M
+    @x
+    D=M-D
+    @START
+    D;JEQ
+
+    @x
+    A=M
+    M=-1
+    @x
+    M=M+1
+    @FILL
+    0;JMP
