@@ -9,11 +9,6 @@
 // program clears the screen, i.e. writes "white" in every pixel.
 
 // Put your code here.
-    // 24576 is the last pixel address
-    @24576
-    D=A
-    @last
-    M=D
 
 (START)
     @SCREEN
@@ -28,8 +23,8 @@
     0;JMP
 
 (UNFILL)
-    @last
-    D=M
+    @KBD
+    D=A
     @x
     D=M-D
     @START
@@ -44,8 +39,8 @@
     0;JMP
 
 (FILL)
-    @last
-    D=M
+    @KBD
+    D=A
     @x
     D=M-D
     @START
