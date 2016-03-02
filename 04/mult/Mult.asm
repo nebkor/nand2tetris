@@ -9,6 +9,14 @@
 // Put your code here.
     @R2
     M=0
+    @R0
+    D=M
+    @STOP
+    D;JEQ
+    @R1
+    D=M
+    @STOP
+    D;JEQ
 (ADD)
     // load y's value into D, add it to what's in R2
     @R1
