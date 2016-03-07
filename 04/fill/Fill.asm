@@ -24,11 +24,16 @@
 
 (UNFILL)
     @KBD
+    D=M
+    @START
+    D;JGT // jump to the beginning if a key is pressed
+
+    @KBD
     D=A
     @x
     D=M-D
     @START
-    D;JEQ
+    D;JEQ // jump to start if contents of x are the same as the address of @KBD
 
     @x
     A=M
@@ -39,6 +44,11 @@
     0;JMP
 
 (FILL)
+    @KBD
+    D=M
+    @START
+    D;JEQ // jump to start if a key is not pressed
+
     @KBD
     D=A
     @x
