@@ -1,0 +1,43 @@
+#lang racket
+
+(define COMMENTS #px"[\\W]{0,}//.*")
+
+(define (strip-asm asmlist)
+  (filter (λ (x) (non-empty-string? x))
+          (for/list ([l (in-list asmlist)])
+            (string-trim (regexp-replace COMMENTS l "")))))
+
+(define (build-symtable asmlist)
+  #t)
+
+(define (desymify asmlist symtable)
+  #t)
+
+(define (translate asm)
+  '("111000" "000111"))
+
+(define (write-hackfile contents hackfile)
+  (with-output-to-file hackfile
+    (λ ()
+      (begin
+        (printf contents)
+        (newline)))
+    #:exists 'replace))
+
+(define (assemble asmfile)
+  (let* ([asmlist (strip-asm (file->lines asmfile))]
+         [symtable (build-symtable asmlist)]
+         [nosymasm (desymify asmlist symtable)]
+         [binarylist (translate nosymasm)]
+         [bstring (string-join binarylist "\n")]
+         [hackfile (regexp-replace #rx"\\.asm$" asmfile ".hack")])
+    (write-hackfile bstring hackfile)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(module+ main
+  (require racket/cmdline)
+  (command-line
+   #:program "assembler"
+   #:args (asmfile)
+   (assemble asmfile)))
