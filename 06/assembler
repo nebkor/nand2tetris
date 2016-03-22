@@ -1,8 +1,13 @@
 #lang racket
 
-;; utility function
-(define (member? x lst)
-  (> (length (member x lst)) 0))
+;; utility functions
+(define member? member)
+
+(define (safe-hash-update hash key val)
+  (displayln (~a "key: " key ", val: " val))
+  (if (hash-has-key? hash key)
+      hash
+      (hash-update hash key val)))
 
 ;; regexes for our stuff
 (define COMMENTS #px"[\\W]{0,}//.*")
@@ -39,7 +44,7 @@
 (define (build-symtable asmlist)
   (define (find-labels)
     (map get-label
-         (filter (λ (x) (regexp-match LABEL asmlist)))))
+         (filter (λ (x) (regexp-match LABEL x)) asmlist)))
   (let ([labels (find-labels)])
     (let loop ([st (make-immutable-hash (get-builtins-assoc))]
                [asmlist asmlist]
@@ -59,10 +64,10 @@
                  [(member? v labels)
                   (loop st rest nextn vn)]
                  [else
-                  (loop (hash-update st v vn) rest nextn (add1 vn))]))]
+                  (loop (safe-hash-update st v vn) rest nextn (add1 vn))]))]
              [(regexp-match LABEL line)
               (let ([v (get-label line)])
-                (loop (hash-update st v nextn) rest nextn vn))]
+                (loop (safe-hash-update st v nextn) rest nextn vn))]
              [else
               (loop st rest nextn vn)]))))))
 
