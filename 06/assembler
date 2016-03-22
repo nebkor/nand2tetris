@@ -18,6 +18,38 @@
 (define VAR #px"@[a-zA-Z0-9_]+")
 (define NUM #px"^[0-9]+$")
 
+;; ops to binary tables
+(define COMP
+  (make-immutable-hash
+   '(
+     ;; A is 1
+     ("M" . "1110000") ("!M" . "1110001") ("-M" . "1110011") ("M+1" . "1110111")
+     ("M-1" . "1110010") ("D+M" . "1000010") ("D-M" . "1010011") ("M-D" . "1000111")
+     ("D&M" . "1000000") ("D|M" . "1010101")
+     ;; A is 0
+     ("0" . "0101010") ("1" . "0111111") ("-1" . "0111010") ("D" . "0001100")
+     ("A" . "0110000") ("!D" . "0001101") ("!A" . "0110001") ("-D" . "0001111")
+     ("-A" . "0110011") ("D+1" . "0011111") ("A+1" . "0110111") ("D-1" . "0001110")
+     ("A-1" . "0110010") ("D+A" . "0000010") ("D-A" . "0010011") ("A-D" . "0000111")
+     ("D&A" . "0000000") ("D|A" . "0010101"))))
+
+(define DEST
+  (make-immutable-hash
+   '((() . "000")
+     ("M" . "001")
+     ("D" . "010")
+     ("MD" . "011")
+     ("A" . "100")
+     ("AM" . "101")
+     ("AD" . "110")
+     ("AMD" . "111"))))
+
+(define JUMP
+  (make-immutable-hash
+   '((() . "000") ("JGT" . "001") ("JEQ" . "010") ("JGE" . "011") ("JLT" . "100")
+     ("JNE" . "101") ("JLE" . "110") ("JMP" . "111"))))
+
+
 (define (decode-ainstr inst)
   (let ([v (car (string-split inst "@"))])
     (if (regexp-match NUM v)
@@ -53,7 +85,7 @@
 (define (build-symtable asmlist)
   (define (find-labels)
     (map get-label
-         (filter (λ (x) (regexp-match LABEL x)) asmlist)))
+         (filter (λ (x) (label? x)) asmlist)))
   (let ([labels (find-labels)])
     (let loop ([st (make-immutable-hash (get-builtins-assoc))]
                [asmlist asmlist]
@@ -65,7 +97,7 @@
                 [rest (cdr asmlist)]
                 [nextn (add1 n)])
             (cond
-             [(regexp-match VAR line)
+             [(ainstr? line)
               (let ([v (decode-ainstr line)])
                 (cond
                  [(number? v) ;; line is like "@10"
@@ -73,17 +105,19 @@
                  [(member? v labels) ;; the "@FOO" refers to "(FOO)"
                   (loop st rest nextn vn)]
                  [else
-                  (let ([old? (hash-has-key? st v)]) ;; check to see if we've seen @foo before
-                    (loop (safe-hash-set st v vn) rest nextn (if old? vn (add1 vn))))]))]
-             [(regexp-match LABEL line)
+                  (loop (safe-hash-set st v vn)
+                        rest
+                        nextn
+                        (if (hash-has-key? st v) vn (add1 vn)))]))]
+             [(label? line)
               (let ([v (get-label line)])
                 (loop (safe-hash-set st v n) rest n vn))]
-             [else
+             [else ;; we're a cinstr, don't update symtable, inc the instr count
               (loop st rest nextn vn)]))))))
 
 (define (desymify asmlist symtable)
   (for/list ([i (in-list asmlist)]
-             #:unless (label? i))
+             #:unless (label? i)) ;; labels aren't real instructions
     (if (ainstr? i)
         (let ([key (decode-ainstr i)])
           (if (hash-has-key? symtable key)
@@ -91,8 +125,47 @@
               (~a "@" key)))
         i)))
 
+(define (get-jump i)
+  (let* ([jsplit (string-split i ";")]
+         [jump (if (= 1 (length jsplit))
+                   '()
+                   (cadr jsplit))])
+    (hash-ref JUMP jump)))
+
+(define (get-dest i)
+  (let* ([dsplit (string-split i "=")]
+         [dest (if (= 1 (length dsplit))
+                   '()
+                   (car dsplit))])
+    (hash-ref DEST dest)))
+
+(define (get-comp i)
+  (let* ([dsplit (string-split i "=")]
+         [compjmp (if (= 1 (length dsplit))
+                      (car dsplit)
+                      (cadr dsplit))]
+         [comp (car (string-split compjmp ";"))])
+    (hash-ref COMP comp)))
+
+(define (translate-ainstr i)
+  (let ([n (decode-ainstr i)])
+    (~a #:width 16
+        #:left-pad-string "0"
+        #:align 'right
+        (number->string n 2))))
+
+(define (translate-cinstr i)
+  (let ([cookie "111"]
+        [comp (get-comp i)]
+        [dest (get-dest i)]
+        [jump (get-jump i)])
+    (~a cookie comp dest jump)))
+
 (define (translate asm)
-  asm)
+  (for/list ([l (in-list asm)])
+    (if (ainstr? l)
+        (translate-ainstr l)
+        (translate-cinstr l))))
 
 (define (write-hackfile contents hackfile)
   (with-output-to-file hackfile
@@ -110,10 +183,6 @@
          [bstring (string-join binarylist "\n")]
          [hackfile (regexp-replace #rx"\\.asm$" asmfile ".hack")])
     (write-hackfile bstring hackfile)))
-
-;; (define _asmlist (strip-asm (file->lines "rect/Rect.asm")))
-;; (define _symtable (build-symtable _asmlist))
-;; (define _nosymasml (desymify _asmlist _symtable))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (module+ main
