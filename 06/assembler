@@ -47,18 +47,8 @@
    '((() . "000") ("JGT" . "001") ("JEQ" . "010") ("JGE" . "011") ("JLT" . "100")
      ("JNE" . "101") ("JLE" . "110") ("JMP" . "111"))))
 
-
-(define (decode-ainstr inst)
-  (let ([v (car (string-split inst "@"))])
-    (if (regexp-match NUM v)
-        (string->number v)
-        v)))
-
-(define (get-label x)
-  (string-trim (string-trim x "(") ")"))
-
-(define (get-builtins-assoc)
-  (let ([registers (for/list ([i 15])
+(define BUILTINS
+  (let ([registers (for/list ([i 16])
                      (cons (~a "R" i) i))]
         [misc '(("SP" . 0)
                 ("LCL" . 1)
@@ -68,6 +58,15 @@
                 ("SCREEN" . 16384)
                 ("KBD" . 24576))])
     (append registers misc)))
+
+(define (decode-ainstr inst)
+  (let ([v (car (string-split inst "@"))])
+    (if (regexp-match NUM v)
+        (string->number v)
+        v)))
+
+(define (get-label x)
+  (string-trim (string-trim x "(") ")"))
 
 (define (label? l)
   (regexp-match LABEL l))
@@ -85,7 +84,7 @@
     (map get-label
          (filter (λ (x) (label? x)) asmlist)))
   (let ([labels (find-labels)])
-    (let loop ([st (make-immutable-hash (get-builtins-assoc))]
+    (let loop ([st (make-immutable-hash BUILTINS)]
                [asmlist asmlist]
                [n 0]
                [vn 16])
