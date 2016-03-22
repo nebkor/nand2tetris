@@ -1,13 +1,16 @@
 #lang racket
 
 ;; utility functions
-(define member? member)
+(define (member? x lst)
+  (let ([res (member x lst)])
+    (if (eqv? #f res)
+        #f
+        #t)))
 
-(define (safe-hash-update hash key val)
-  (displayln (~a "key: " key ", val: " val))
+(define (safe-hash-set hash key val)
   (if (hash-has-key? hash key)
       hash
-      (hash-update hash key val)))
+      (hash-set hash key val)))
 
 ;; regexes for our stuff
 (define COMMENTS #px"[\\W]{0,}//.*")
@@ -36,6 +39,8 @@
                 ("KBD" . 24576))])
     (append registers misc)))
 
+
+
 (define (strip-asm asmlist)
   (filter (λ (x) (non-empty-string? x))
           (for/list ([l (in-list asmlist)])
@@ -59,15 +64,16 @@
              [(regexp-match VAR line)
               (let ([v (decode-ainstr line)])
                 (cond
-                 [(number? v)
+                 [(number? v) ;; line is like "@10"
                   (loop st rest nextn vn)]
-                 [(member? v labels)
+                 [(member? v labels) ;; the "@FOO" refers to "(FOO)"
                   (loop st rest nextn vn)]
                  [else
-                  (loop (safe-hash-update st v vn) rest nextn (add1 vn))]))]
+                  (let ([old? (hash-has-key? st v)]) ;; check to see if we've seen @foo before
+                    (loop (safe-hash-set st v vn) rest nextn (if old? vn (add1 vn))))]))]
              [(regexp-match LABEL line)
               (let ([v (get-label line)])
-                (loop (safe-hash-update st v nextn) rest nextn vn))]
+                (loop (safe-hash-set st v n) rest n vn))]
              [else
               (loop st rest nextn vn)]))))))
 
