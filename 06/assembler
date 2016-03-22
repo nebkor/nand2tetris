@@ -80,14 +80,12 @@
             (string-trim (regexp-replace COMMENTS l "")))))
 
 (define (build-symtable asmlist)
-  (define (find-labels)
-    (map get-label
-         (filter (λ (x) (label? x)) asmlist)))
-  (let ([labels (find-labels)])
+  (let ([labels (map get-label
+                     (filter (λ (x) (label? x)) asmlist))])
     (let loop ([st (make-immutable-hash BUILTINS)]
                [asmlist asmlist]
-               [n 0]
-               [vn 16])
+               [n 0]    ;; initial instruction addr
+               [vn 16]) ;; initial variable addr
       (if (null? asmlist)
           st
           (let ([line (car asmlist)]
@@ -101,16 +99,13 @@
                   (loop st rest nextn vn)]
                  [(member? v labels) ;; the "@FOO" refers to "(FOO)"
                   (loop st rest nextn vn)]
-                 [else
-                  (loop (safe-hash-set st v vn) ;; it's a variable declaration or reference
-                        rest
-                        nextn
+                 [else ;; it's a variable declaration or reference
+                  (loop (safe-hash-set st v vn) rest nextn
                         (if (hash-has-key? st v)
                             vn
-                            (add1 vn)))]))]
-             [(label? line)
-              (let ([v (get-label line)])
-                (loop (safe-hash-set st v n) rest n vn))]
+                            (add1 vn)))]))] ;; only bump the variable addr if we've not seen this before
+             [(label? line) ;; labels get removed from de-symified code, so don't inc the instr count
+              (loop (safe-hash-set st (get-label line) n) rest n vn)]
              [else ;; we're a cinstr, don't update symtable, inc the instr count
               (loop st rest nextn vn)]))))))
 
