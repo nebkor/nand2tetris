@@ -1,6 +1,35 @@
 #lang racket
 
+;; utility function
+(define (member? x lst)
+  (> (length (member x lst)) 0))
+
+;; regexes for our stuff
 (define COMMENTS #px"[\\W]{0,}//.*")
+(define LABEL #px"\\([a-zA-Z0-9_]+\\)")
+(define VAR #px"@[a-zA-Z0-9_]")
+(define NUM #px"^[0-9]+$")
+
+(define (decode-ainstr inst)
+  (let ([v (car (string-split inst "@"))])
+    (if (regexp-match NUM v)
+        (string->number v)
+        v)))
+
+(define (get-label x)
+  (string-trim (string-trim x "(") ")"))
+
+(define (get-builtins-assoc)
+  (let ([registers (for/list ([i 15])
+                     (cons (~a "R" i) i))]
+        [misc '(("SP" . 0)
+                ("LCL" . 1)
+                ("ARG" . 2)
+                ("THIS" . 3)
+                ("THAT" . 4)
+                ("SCREEN" . 16384)
+                ("KBD" . 24576))])
+    (append registers misc)))
 
 (define (strip-asm asmlist)
   (filter (λ (x) (non-empty-string? x))
@@ -8,7 +37,34 @@
             (string-trim (regexp-replace COMMENTS l "")))))
 
 (define (build-symtable asmlist)
-  #t)
+  (define (find-labels)
+    (map get-label
+         (filter (λ (x) (regexp-match LABEL asmlist)))))
+  (let ([labels (find-labels)])
+    (let loop ([st (make-immutable-hash (get-builtins-assoc))]
+               [asmlist asmlist]
+               [n 0]
+               [vn 16])
+      (if (null? asmlist)
+          st
+          (let ([line (car asmlist)]
+                [rest (cdr asmlist)]
+                [nextn (add1 n)])
+            (cond
+             [(regexp-match VAR line)
+              (let ([v (decode-ainstr line)])
+                (cond
+                 [(number? v)
+                  (loop st rest nextn vn)]
+                 [(member? v labels)
+                  (loop st rest nextn vn)]
+                 [else
+                  (loop (hash-update st v vn) rest nextn (add1 vn))]))]
+             [(regexp-match LABEL line)
+              (let ([v (get-label line)])
+                (loop (hash-update st v nextn) rest nextn vn))]
+             [else
+              (loop st rest nextn vn)]))))))
 
 (define (desymify asmlist symtable)
   #t)
