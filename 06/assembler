@@ -3,9 +3,7 @@
 ;; utility functions
 (define (member? x lst)
   (let ([res (member x lst)])
-    (if (eqv? #f res)
-        #f
-        #t)))
+    (not (eqv? #f res))))
 
 (define (safe-hash-set hash key val)
   (if (hash-has-key? hash key)
@@ -14,8 +12,8 @@
 
 ;; regexes for our stuff
 (define COMMENTS #px"[\\W]{0,}//.*")
-(define LABEL #px"\\([a-zA-Z0-9_]+\\)")
-(define VAR #px"@[a-zA-Z0-9_]+")
+(define LABEL #px"\\([a-zA-Z0-9_.$]+\\)")
+(define VAR #px"@[a-zA-Z0-9_.$]+")
 (define NUM #px"^[0-9]+$")
 
 ;; ops to binary tables
@@ -105,10 +103,12 @@
                  [(member? v labels) ;; the "@FOO" refers to "(FOO)"
                   (loop st rest nextn vn)]
                  [else
-                  (loop (safe-hash-set st v vn)
+                  (loop (safe-hash-set st v vn) ;; it's a variable declaration or reference
                         rest
                         nextn
-                        (if (hash-has-key? st v) vn (add1 vn)))]))]
+                        (if (hash-has-key? st v)
+                            vn
+                            (add1 vn)))]))]
              [(label? line)
               (let ([v (get-label line)])
                 (loop (safe-hash-set st v n) rest n vn))]
@@ -186,8 +186,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (module+ main
-  (require racket/cmdline)
   (command-line
-   #:program "assembler"
    #:args (asmfile)
    (assemble asmfile)))
