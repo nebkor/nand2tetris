@@ -15,7 +15,7 @@
 ;; regexes for our stuff
 (define COMMENTS #px"[\\W]{0,}//.*")
 (define LABEL #px"\\([a-zA-Z0-9_]+\\)")
-(define VAR #px"@[a-zA-Z0-9_]")
+(define VAR #px"@[a-zA-Z0-9_]+")
 (define NUM #px"^[0-9]+$")
 
 (define (decode-ainstr inst)
@@ -39,7 +39,11 @@
                 ("KBD" . 24576))])
     (append registers misc)))
 
+(define (label? l)
+  (regexp-match LABEL l))
 
+(define (ainstr? l)
+  (regexp-match VAR l))
 
 (define (strip-asm asmlist)
   (filter (λ (x) (non-empty-string? x))
@@ -78,10 +82,17 @@
               (loop st rest nextn vn)]))))))
 
 (define (desymify asmlist symtable)
-  #t)
+  (for/list ([i (in-list asmlist)]
+             #:unless (label? i))
+    (if (ainstr? i)
+        (let ([key (decode-ainstr i)])
+          (if (hash-has-key? symtable key)
+              (~a "@" (hash-ref symtable key))
+              (~a "@" key)))
+        i)))
 
 (define (translate asm)
-  '("111000" "000111"))
+  asm)
 
 (define (write-hackfile contents hackfile)
   (with-output-to-file hackfile
@@ -94,12 +105,15 @@
 (define (assemble asmfile)
   (let* ([asmlist (strip-asm (file->lines asmfile))]
          [symtable (build-symtable asmlist)]
-         [nosymasm (desymify asmlist symtable)]
-         [binarylist (translate nosymasm)]
+         [nosymasml (desymify asmlist symtable)]
+         [binarylist (translate nosymasml)]
          [bstring (string-join binarylist "\n")]
          [hackfile (regexp-replace #rx"\\.asm$" asmfile ".hack")])
     (write-hackfile bstring hackfile)))
 
+;; (define _asmlist (strip-asm (file->lines "rect/Rect.asm")))
+;; (define _symtable (build-symtable _asmlist))
+;; (define _nosymasml (desymify _asmlist _symtable))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (module+ main
