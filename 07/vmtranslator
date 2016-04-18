@@ -1,0 +1,78 @@
+#lang racket
+
+;; utility functions
+(define (member? x lst)
+  (let ([res (member x lst)])
+    (not (eqv? #f res))))
+
+(define (safe-hash-set hash key val)
+  (if (hash-has-key? hash key)
+      hash
+      (hash-set hash key val)))
+
+;; regexes for our stuff
+(define COMMENTS #px"[\\W]{0,}//.*")
+(define LABEL #px"\\([a-zA-Z0-9_.$]+\\)")
+(define VAR #px"@[a-zA-Z0-9_.$]+")
+(define NUM #px"^[0-9]+$")
+
+(define BUILTINS
+  (let ([registers (for/list ([i 16])
+                     (cons (~a "R" i) i))]
+        [misc '(("SP" . 0)
+                ("LCL" . 1)
+                ("ARG" . 2)
+                ("THIS" . 3)
+                ("THAT" . 4)
+                ("SCREEN" . 16384)
+                ("KBD" . 24576))])
+    (append registers misc)))
+
+(define (get-label x)
+  (string-trim (string-trim x "(") ")"))
+
+(define (label? l)
+  (regexp-match LABEL l))
+
+(define (strip-comments codelist)
+  (filter (λ (x) (non-empty-string? x))
+          (for/list ([l (in-list asmlist)])
+            (string-trim (regexp-replace COMMENTS l "")))))
+
+
+(define (translate-ainstr i)
+  (let ([n (decode-ainstr i)])
+    (~a #:width 16
+        #:left-pad-string "0"
+        #:align 'right
+        (number->string n 2))))
+
+
+(define (translate asm)
+  (for/list ([l (in-list asm)])
+    (if (ainstr? l)
+        (translate-ainstr l)
+        (translate-cinstr l))))
+
+(define (write-hackfile contents hackfile)
+  (with-output-to-file hackfile
+    (λ ()
+      (begin
+        (printf contents)
+        (newline)))
+    #:exists 'replace))
+
+(define (assemble asmfile)
+  (let* ([asmlist (strip-asm (file->lines asmfile))]
+         [symtable (build-symtable asmlist)]
+         [nosymasml (desymify asmlist symtable)]
+         [binarylist (translate nosymasml)]
+         [bstring (string-join binarylist "\n")]
+         [hackfile (regexp-replace #rx"\\.asm$" asmfile ".hack")])
+    (write-hackfile bstring hackfile)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(module+ main
+  (command-line
+   #:args (asmfile)
+   (assemble asmfile)))
